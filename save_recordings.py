@@ -3,6 +3,7 @@ from scipy.io.wavfile import write
 import sys
 from pathlib import Path
 import time
+import shutil
 
 
 MAX_FILE_BACKLOG = 10
@@ -18,7 +19,9 @@ while True:
     myrecording = sd.rec(int(RECORDING_TIME * SAMPLE_RATE), samplerate=SAMPLE_RATE, channels=1)
     sd.wait()  # Wait until recording is finished
     fname = outdir / f'{str(datetime.now())}.wav'
-    write(fname, SAMPLE_RATE, myrecording)  # Save as WAV file
+    fname_tmp = fname.with_suffix('.tmp')
+    write(fname_tmp, SAMPLE_RATE, myrecording)  # Save as WAV file
+    shutil.move(fname_tmp, fname)
 
     if len(list(outdir.iterdir())) > MAX_FILE_BACKLOG:
         print('Max file backlog reached. Waiting')
