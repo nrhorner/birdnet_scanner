@@ -23,7 +23,7 @@ test_dir = Path('/home/neil/Desktop/birdnet')
 stream = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, output=True, frames_per_buffer=CHUNK)  # If you want to stream to speakers
 
 chunk_nu = 0
-play_audio = False
+play_audio = True
 try:
     while True:
         data = s.recv(CHUNK)

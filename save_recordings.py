@@ -6,9 +6,8 @@ import time
 import shutil
 
 
-MAX_FILE_BACKLOG = 10
 from datetime import datetime
-RECORDING_TIME = 15
+RECORDING_TIME = 30
 SAMPLE_RATE = 44100
 
 outdir = Path.home() / 'bns_recordings'
@@ -23,7 +22,7 @@ while True:
     write(fname_tmp, SAMPLE_RATE, myrecording)  # Save as WAV file
     shutil.move(fname_tmp, fname)
 
-    if len(list(outdir.iterdir())) > MAX_FILE_BACKLOG:
+    if len(list(outdir.iterdir())) >= MAX_FILE_BACKLOG:
         print('Max file backlog reached. Waiting')
         time.sleep(5)
 

@@ -5,7 +5,7 @@ import socket
 import sys
 import time
 import wave
-
+## This does not work at the moment
 PORT = 4442
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
