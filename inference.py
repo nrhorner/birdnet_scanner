@@ -1,42 +1,67 @@
 from pathlib import Path
 import time
+import datetime
+import subprocess as sub
+import sys
+import yaml
 
-outdir = Path.home() / 'bns_recordings'
-outdir.mkdir(exist_ok=True)
 
-BN_DIR = '/home/neil/git/BirdNET'
+cfg_path = sys.argv[1]
+with open(cfg_path, 'r') as fh:
+    cfg = yaml.load(fh)
 
-inference_dir = Path.home() / 'bns_ids'
+proj_dir = Path(cfg_path).parent
+recording_dir = proj_dir / 'recordings'
+recording_dir.mkdir(exist_ok=True)
+
+
+inference_dir = proj_dir / 'bns_ids'
 inference_dir.mkdir(exist_ok=True)
 
-import subprocess as sub
+week = str(datetime.date.today().isocalendar()[1])
 
-SERVER = '192.168.0.52'
+bnlite_root = Path(cfg['bnlite_root']).expanduser()
+analyze_script = bnlite_root / 'analyze.py'
 
-while True:
+
+def copyfiles():
+
     print('copying files from listener')
     sub.call(['rsync',
               '-av',
               '--remove-source-files',
               '--include', '*.wav',
-              f'pi@{SERVER}:/home/pi/bns_recordings/',
-              '/home/neil/bns_recordings'
+              f'pi@{cfg["recorder_ip"]}:/home/pi/bn/recordings',  # TODO: Remove this hard coding
+              f'{recording_dir}'
               ])
-    if len(list(outdir.iterdir())) > 0:
-        print('Doing bird song id')
 
-        sub.call(['python3', '/home/neil/git/BirdNET/analyze.py',
-                  '--i', outdir,
-                  '--o' , inference_dir], cwd=BN_DIR)
 
-        # Now remove files
-        print('removing local files')
-        for f in outdir.iterdir():
-            f.unlink()
+def run_birdnet():
 
-    else:
-        time.sleep(10)
-        continue
+    for file_ in recording_dir.iterdir():
+        print(f'Doing bird song id for {file_.name}')
+
+        outfile = inference_dir / f'{file_.name}.csv'
+        sub.call(['python3', str(analyze_script),
+                  '--i', file_,
+                  '--o' , outfile,
+                  '--lat', str(cfg['lat_long'][0]),
+                  '--lon', str(cfg['lat_long'][1]),
+                  '--week', week], cwd=str(bnlite_root))
+
+        # # Now remove files
+        # print('removing local files')
+        # for f in outdir.iterdir():
+        #     f.unlink()
+
+while True:
+    copyfiles()
+    run_birdnet()
+    time.sleep(30)
+
+
+
+
 
 
 

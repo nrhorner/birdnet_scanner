@@ -10,9 +10,6 @@ import yaml
 
 FREE_SPACE_LIMIT_MB = 100 # If less than 100mb remaining, don't record any more samples
 
-def check_disk_space():
-    total, used, free = shutil.disk_usage("/")
-
 cfg_path = sys.argv[1]
 with open(cfg_path, 'r') as fh:
     cfg = yaml.load(fh)

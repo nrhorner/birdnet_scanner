@@ -1,0 +1,10 @@
+# BirdNEt options
+min_conf: 0.8
+lat_long: [00.00, -00.00]
+
+# Pi options
+recorder_ip: '192.168.0.52'
+recording_length: 120
+sample_rate: 48000
+bnlite_analyse_script: '~/git/BirdNET-Lite/analyse.py'
+
