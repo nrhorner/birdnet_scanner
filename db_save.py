@@ -4,69 +4,75 @@ This code will take the birdnet ids, parse and stick in the DB
 from pathlib import Path
 import pandas as pd
 import sqlalchemy
+import shutil
 from datetime import datetime
 
+from typing import List
 
-def parse_ids(id_dir: Path) -> pd.DataFrame:
+def parse_ids(id_dir: Path, confidence) -> pd.DataFrame:
+
+    # Place to store_ids_before deleting in case soemthing goes wrong
+    temp_id_dir = Path(str(id_dir) + '_processed')
+    temp_id_dir.mkdir(exist_ok=True)
 
     dfs = []
-
+    # id_dir = Path('/mnt/pi4/bn/bns_ids')
     for f in id_dir.iterdir():
-        dfs.append(pd.read_csv(f, sep='\t'))
 
-    df = pd.concat(dfs)
-    df = df[df['Confidence'] > 0.99]
+        if f.is_dir():
+            continue
+
+        if not str(f).endswith('csv'):
+            continue
+        try:
+            d = pd.read_csv(f, sep=';')
+        except Exception:
+            shutil.move(f, temp_id_dir / f.name)
+            continue
+
+        shutil.move(f, temp_id_dir / f.name)
+
+        if len(d) == 0:
+            continue
+
+        try:
+            d['time'] = f.with_suffix("").name
+        except Exception:
+            print(f'File name with error: {f}')
+
+        d.time = pd.to_datetime(d.time, yearfirst=True)
+        dfs.append(d)
+
+    try:
+        df = pd.concat(dfs)
+    except (ValueError, UnboundLocalError):
+        print('No ids to save')
+        return
+    df = df[df['Confidence'] > confidence]
 
     df.sort_values('Confidence', ascending=False, inplace=True)
-    df.rename(columns={'Begin File': 'time'}, inplace=True)
-    df.time = df.time.map(lambda x: x.strip('.wav'))
-    df.time = pd.to_datetime(df.time, yearfirst=True)
-    # df.set_index('time', drop=True, inplace=True)
-
     return df
 
 
-def run(root: Path):
+def run(root: Path, conf) -> List[Path]:
     # TDOD: How to just add new rows rather then overwrite the table
     db_file = str(root / 'bn.db')
 
     engine = sqlalchemy.create_engine(f'sqlite:///{db_file}', echo=True)
 
     with engine.connect() as connection:
-        id_file = root / 'bns_ids'
-        df_ids = parse_ids(id_file)
+        id_root = root / 'bns_ids'
+        df_ids = parse_ids(id_root, conf)
+        if df_ids is not None:
 
-        # save all ids to ids db
-        df_ids.to_sql('ids', connection, if_exists='replace')
-        df_ids.to_csv(root / 'test.csv')
-
-
-
-
-# def test_time():
-#     db  = '/home/neil/bn/bn.db'
-#     csv = '/home/neil/bn/test.csv'
-#
-#
-#     start = datetime.now()
-#     df = pd.read_csv(csv)
-#     end = datetime.now()
-#     elapsed = end = start
-#     print(elapsed.microsecond)
-#
-#     start = datetime.now()
-#     engine = sqlalchemy.create_engine(f'sqlite:///{db}', echo=True)
-#     sqlite_connection = engine.connect()
-#     df = pd.read_sql('SELECT * FROM ids;', sqlite_connection)
-#     end = datetime.now()
-#     elapsed = end = start
-#     print(elapsed.microsecond)
-
-
+            # save all ids to ids db
+            df_ids.to_sql('ids', connection, if_exists='append')
+            df_ids.to_csv(root / 'test.csv')
 
 
 if __name__ == '__main__':
-    bn_dir = Path('~/bn').expanduser()
-    run(bn_dir)
+    import sys
+    root_ = sys.argv[1]
+    conf_ = sys.argv[2]
 
-    # test_time()
+    run(Path(root_), float(conf_))

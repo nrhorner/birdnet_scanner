@@ -1,18 +1,20 @@
 import sqlalchemy
 import pandas as pd
+from datetime import datetime, timedelta
 
-def top_ids() -> pd.DataFrame:
+
+def top_ids(db_file=None) -> pd.DataFrame:
     """
     Just for testing
     Maybe add date range option
     """
-    db_file = str('/home/neil/bn/bn.db')
+    if not db_file:
+        db_file = str('/home/neil/bn/bn.db')
     engine = sqlalchemy.create_engine(f'sqlite:///{db_file}', echo=True)
 
     sql = """SELECT COUNT(`index`) as count, `Common Name`
                 FROM ids
                 GROUP BY `Common Name`
-                HAVING COUNT(`index`) > 5
                 ORDER BY count  DESC;
                 """
 
@@ -21,22 +23,29 @@ def top_ids() -> pd.DataFrame:
         return x
 
 
-def top_ids_last_24h() -> pd.DataFrame:
+def top_ids_last_24h(db_file=None) -> pd.DataFrame:
     # Theres no current recording so choose last active day for testing
-    db_file = str('/home/neil/bn/bn.db')
+    if not db_file:
+        db_file = str('/home/neil/bn/bn.db')
     engine = sqlalchemy.create_engine(f'sqlite:///{db_file}', echo=True)
 
-    start = '2021-03-08'
-    end = '2021-03-09'
+    start = datetime.now() - timedelta(days = 1)
+    end = datetime.now()
 
-    sql = f"""SELECT COUNT(`index`) as count, `Common Name`
+    sql = f"""SELECT COUNT(`index`) as count, `Common Name`, max(time)
                     FROM ids
-                    WHERE TIME > {start} AND time < {end}
+                    WHERE time BETWEEN '{start}' AND '{end}'
                     GROUP BY `Common Name`
-                    HAVING COUNT(`index`) > 5
                     ORDER BY count  DESC;
                     """
 
     with engine.connect() as con:
         x = pd.read_sql(sql, con)
+        x.rename(columns={'max(time)': 'last seen'}, inplace=True)
+        x['last seen'] = x['last seen'].astype('datetime64[s]')
+        x.sort_values('last seen', ascending=False, inplace=True)
         return x
+
+if __name__ == '__main__':
+    x = top_ids_last_24h('/mnt/pi4/bn/bn.db')
+    print(x)

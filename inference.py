@@ -4,6 +4,10 @@ import datetime
 import subprocess as sub
 import sys
 import yaml
+import shutil
+import threading
+
+from birdnet_scanner import db_save
 
 
 cfg_path = sys.argv[1]
@@ -17,6 +21,8 @@ recording_dir.mkdir(exist_ok=True)
 
 inference_dir = proj_dir / 'bns_ids'
 inference_dir.mkdir(exist_ok=True)
+processed_wav_dir = proj_dir / 'processed_wavs'
+processed_wav_dir.mkdir(exist_ok=True)
 
 week = str(datetime.date.today().isocalendar()[1])
 
@@ -25,39 +31,62 @@ analyze_script = bnlite_root / 'analyze.py'
 
 
 def copyfiles():
+    """
+    Copy any finished recordings from the Pi zero
 
-    print('copying files from listener')
-    sub.call(['rsync',
-              '-av',
-              '--remove-source-files',
-              '--include', '*.wav',
-              f'pi@{cfg["recorder_ip"]}:/home/pi/bn/recordings',  # TODO: Remove this hard coding
-              f'{recording_dir}'
-              ])
+    The order of --include and --excludes is significant
+    """
+    while True:
+        print('copying files from listener')
+        sub.call(['rsync',
+                  '-av',
+                  '--remove-source-files',
+                  '--progress',
+                  '--exclude', ".*",
+                  '--include', "*.mp3",
+                  '--exclude', "*",
+                        f'pi@{cfg["recorder_ip"]}:/home/pi/bn/recordings/',  # TODO: Remove this hard coding
+                  f'{recording_dir}'
+                  ])
+        time.sleep(5)
 
 
 def run_birdnet():
 
-    for file_ in recording_dir.iterdir():
-        print(f'Doing bird song id for {file_.name}')
+    print('Starting file transfer on seperate thread')
+    th = threading.Thread(target=copyfiles)
+    th.start()
 
-        outfile = inference_dir / f'{file_.name}.csv'
-        sub.call(['python3', str(analyze_script),
-                  '--i', file_,
-                  '--o' , outfile,
-                  '--lat', str(cfg['lat_long'][0]),
-                  '--lon', str(cfg['lat_long'][1]),
-                  '--week', week], cwd=str(bnlite_root))
+    print('Doing inference')
+    while True:
+        for i, file_ in enumerate(recording_dir.iterdir()):
+            if not file_.is_file():
+                continue
+            if file_.name.startswith('.'):
+                continue
 
-        # # Now remove files
-        # print('removing local files')
-        # for f in outdir.iterdir():
-        #     f.unlink()
+            if i % 2 == 0: # 5
+                print('saving to db')
+                dbsave()
 
-while True:
-    copyfiles()
-    run_birdnet()
-    time.sleep(30)
+            print(f'Doing bird song id for {file_.name}')
+
+            outfile = inference_dir / f'{file_.with_suffix("").name}.csv'
+            sub.call(['python3', str(analyze_script),
+                      '--i', file_,
+                      '--o' , outfile,
+                      '--lat', str(cfg['lat_long'][0]),
+                      '--lon', str(cfg['lat_long'][1]),
+                      '--week', week], cwd=str(bnlite_root))
+            shutil.move(file_, processed_wav_dir / file_.name)
+
+
+def dbsave():
+    db_save.run(proj_dir, cfg['min_conf'])
+
+run_birdnet()
+
+
 
 
 
