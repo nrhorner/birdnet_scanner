@@ -6,7 +6,7 @@ import datetime
 app = Flask(__name__)
 
 
-@app.route("/")
+@app.route("/birdids")
 def top_ids():
     log = '/home/neil/app.log'
     with open(log, 'w') as fh:
@@ -22,10 +22,12 @@ def top_ids():
 
         return render_template('summary_tables.html', table_all_time=html_top, table_last_24h=html_24)
 
+
 @app.after_request
 def apply_caching(response):
     response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return response
+
 
 if __name__ == "__main__":
     app.run(host='127.0.0.1')

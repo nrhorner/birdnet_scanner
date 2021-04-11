@@ -15,6 +15,7 @@ def top_ids(db_file=None) -> pd.DataFrame:
     sql = """SELECT COUNT(`index`) as count, `Common Name`
                 FROM ids
                 GROUP BY `Common Name`
+                HAVING COUNT(`index`) > 1
                 ORDER BY count  DESC;
                 """
 
@@ -36,6 +37,7 @@ def top_ids_last_24h(db_file=None) -> pd.DataFrame:
                     FROM ids
                     WHERE time BETWEEN '{start}' AND '{end}'
                     GROUP BY `Common Name`
+                    HAVING COUNT(`index`) > 1
                     ORDER BY count  DESC;
                     """
 
